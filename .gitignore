@@ -1,0 +1,10 @@
+t.go
+test
+test/
+test/*
+dist
+dist/
+dist/*
+.idea
+.idea/
+.idea/*
