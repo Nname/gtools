@@ -100,7 +100,7 @@ func (e *CdEngine) Check(values map[string]interface{}) error {
 	}
 	for yamlName, chart := range data {
 		if err := e.DryRun([]byte(chart)); err != nil {
-			return syserror.New(fmt.Sprintf("err, resource:[%s]", yamlName))
+			return syserror.New(fmt.Sprintf("err, resource:[%s], msg:[%s]", yamlName, err))
 		}
 	}
 	return nil
