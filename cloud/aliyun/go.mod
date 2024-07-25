@@ -1,6 +1,6 @@
 module github.com/Nname/gtools/aliyun
 
-go 1.22.5
+go 1.22.1
 
 require (
 	github.com/alibabacloud-go/darabonba-openapi v0.2.1

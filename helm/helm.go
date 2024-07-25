@@ -87,10 +87,10 @@ func (e *CdEngine) DryRun(data []byte) error {
 	resource := &unstructured.Unstructured{Object: unstructuredObj}
 	gvr, _ := meta.UnsafeGuessKindToResource(resource.GroupVersionKind())
 	_, err = client.Resource(gvr).Namespace(e.ReleaseNameSpace).Get(context.TODO(), resource.GetName(), v1.GetOptions{})
-	if err != nil {
-		return err
+	if errors.IsNotFound(err) {
+		return nil
 	}
-	return nil
+	return err
 }
 
 func (e *CdEngine) Check(values map[string]interface{}) error {
