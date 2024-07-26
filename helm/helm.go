@@ -12,12 +12,14 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
+	"strings"
 )
 
 type CdEngine struct {
@@ -45,6 +47,33 @@ func (e *CdEngine) DynamicClient() (*dynamic.DynamicClient, error) {
 		return nil, err
 	}
 	return client, err
+}
+
+func (e *CdEngine) CreateNamespace() error {
+	client, err := e.DynamicClient()
+	if err != nil {
+		return err
+	}
+	gvr := schema.GroupVersionResource{
+		Group:    "",
+		Version:  "v1",
+		Resource: "namespaces",
+	}
+	newNamespace := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Namespace",
+			"metadata": map[string]interface{}{
+				"name": e.ReleaseNameSpace,
+			},
+		},
+	}
+	_, err = client.Resource(gvr).Get(context.TODO(), newNamespace.GetName(), v1.GetOptions{})
+	if errors.IsNotFound(err) {
+		_, createErr := client.Resource(gvr).Create(context.TODO(), newNamespace, v1.CreateOptions{})
+		return createErr
+	}
+	return nil
 }
 
 func (e *CdEngine) RenderData(NewValues map[string]interface{}) (map[string]string, error) {
@@ -99,6 +128,9 @@ func (e *CdEngine) Check(values map[string]interface{}) error {
 		return err
 	}
 	for yamlName, chart := range data {
+		if strings.TrimSpace(chart) == "" {
+			continue // Skip empty content
+		}
 		if err := e.DryRun([]byte(chart)); err != nil {
 			return syserror.New(fmt.Sprintf("err, resource:[%s], msg:[%s]", yamlName, err))
 		}
@@ -114,7 +146,10 @@ func (e *CdEngine) Install(data []byte) error {
 	utilruntime.Must(scheme.AddToScheme(scheme.Scheme))
 	codecs := serializer.NewCodecFactory(scheme.Scheme)
 	decoder := codecs.UniversalDeserializer()
-	obj, _, err := decoder.Decode(data, nil, nil)
+	obj, kind, err := decoder.Decode(data, nil, nil)
+	if kind == nil {
+		return nil
+	}
 	if err != nil {
 		return err
 	}
@@ -142,6 +177,9 @@ func (e *CdEngine) Install(data []byte) error {
 func (e *CdEngine) Installs(values map[string]interface{}) error {
 	data, err := e.RenderData(values)
 	if err != nil {
+		return err
+	}
+	if err := e.CreateNamespace(); err != nil {
 		return err
 	}
 	for yamlName, chart := range data {
