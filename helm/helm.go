@@ -4,6 +4,12 @@ import (
 	"context"
 	syserror "errors"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"os"
+	"strings"
+
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/chartutil"
 	"helm.sh/helm/v3/pkg/engine"
@@ -19,15 +25,57 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
-	"strings"
 )
 
 type CdEngine struct {
 	ApiServerURL     string
 	Token            string
-	ChartDir         string
+	Chart            string
 	ReleaseName      string
 	ReleaseNameSpace string
+}
+
+func (e *CdEngine) Init() error {
+	if e.isURL() {
+		err := e.LoadUrl()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (e *CdEngine) isURL() bool {
+	u, err := url.Parse(e.Chart)
+	return err == nil && u.Scheme != "" && u.Host != "" && u.Path != ""
+}
+
+func (e *CdEngine) LoadUrl() error {
+	tempDir := os.TempDir()
+	tempFile, err := os.CreateTemp(tempDir, "ChartPacket")
+	if err != nil {
+		return err
+	}
+	defer tempFile.Close()
+
+	client := &http.Client{}
+	resp, err := client.Get(e.Chart)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return err
+	}
+
+	_, err = io.Copy(tempFile, resp.Body)
+	if err != nil {
+		return err
+	}
+	e.Chart = tempFile.Name()
+	defer tempFile.Close()
+	return nil
 }
 
 func (e *CdEngine) RestConfig() *rest.Config {
@@ -77,7 +125,7 @@ func (e *CdEngine) CreateNamespace() error {
 }
 
 func (e *CdEngine) RenderData(NewValues map[string]interface{}) (map[string]string, error) {
-	chart, err := loader.Load(e.ChartDir)
+	chart, err := loader.Load(e.Chart)
 	if err != nil {
 		return nil, err
 	}
