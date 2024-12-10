@@ -11,9 +11,10 @@ import (
 )
 
 type AppService struct {
-	Host []string
-	User string
-	Auth string
+	Host    []string
+	User    string
+	Auth    string
+	Timeout time.Duration
 }
 
 func (e *AppService) ClientV7() (*elasticsearch7.Client, error) {
