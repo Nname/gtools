@@ -67,7 +67,9 @@ func (e *AppService) IndexGetV7(index string) (interface{}, error) {
 		return nil, err
 	}
 	get, err := v7.Indices.Get([]string{index})
-	defer get.Body.Close()
+	defer func() {
+		_ = get.Body.Close() // 明确表示忽略错误
+	}()
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +82,9 @@ func (e *AppService) IndexGetV8(index string) (interface{}, error) {
 		return nil, err
 	}
 	get, err := v7.Indices.Get([]string{index})
-	defer get.Body.Close()
+	defer func() {
+		_ = get.Body.Close() // 明确表示忽略错误
+	}()
 	if err != nil {
 		return nil, err
 	}
